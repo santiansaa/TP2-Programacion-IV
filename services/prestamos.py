@@ -3,16 +3,15 @@
 from datetime import date, timedelta
 
 from fastapi import HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session
 
-from models.socio import Socio
-from models.libro import Libro
 from models.prestamo import Prestamo, PrestamoCrear
+from repositories import prestamos as repo
 
 
 def crear_prestamo(datos: PrestamoCrear, session: Session):
-    socio = session.get(Socio, datos.socio_id)
-    libro = session.get(Libro, datos.libro_id)
+    socio = repo.buscar_socio(session, datos.socio_id)
+    libro = repo.buscar_libro(session, datos.libro_id)
 
     if socio is None or libro is None:
         raise HTTPException(
@@ -26,12 +25,7 @@ def crear_prestamo(datos: PrestamoCrear, session: Session):
             detail="El socio esta inactivo"
         )
 
-    prestamos_activos = session.exec(
-        select(Prestamo).where(
-            Prestamo.socio_id == datos.socio_id,
-            Prestamo.fecha_devolucion == None
-        )
-    ).all()
+    prestamos_activos = repo.listar_por_socio(session, datos.socio_id, activos=True)
 
     if len(prestamos_activos) >= 3:
         raise HTTPException(
@@ -56,16 +50,13 @@ def crear_prestamo(datos: PrestamoCrear, session: Session):
 
     libro.stock -= 1
 
-    session.add(prestamo)
-    session.add(libro)
-    session.commit()
-    session.refresh(prestamo)
+    repo.guardar_con_libro(session, prestamo, libro)
 
     return prestamo
 
 
 def devolver_prestamo(id: int, session: Session):
-    prestamo = session.get(Prestamo, id)
+    prestamo = repo.buscar_prestamo(session, id)
 
     if prestamo is None:
         raise HTTPException(
@@ -89,13 +80,10 @@ def devolver_prestamo(id: int, session: Session):
     prestamo.fecha_devolucion = hoy
     prestamo.multa = dias_atraso * 100
 
-    libro = session.get(Libro, prestamo.libro_id)
+    libro = repo.buscar_libro(session, prestamo.libro_id)
     libro.stock += 1
 
-    session.add(prestamo)
-    session.add(libro)
-    session.commit()
-    session.refresh(prestamo)
+    repo.guardar_con_libro(session, prestamo, libro)
 
     return prestamo
 
@@ -105,7 +93,7 @@ def obtener_prestamos_socio(
     activos: bool,
     session: Session
 ):
-    socio = session.get(Socio, id)
+    socio = repo.buscar_socio(session, id)
 
     if socio is None:
         raise HTTPException(
@@ -113,13 +101,4 @@ def obtener_prestamos_socio(
             detail="Socio no encontrado"
         )
 
-    consulta = select(Prestamo).where(
-        Prestamo.socio_id == id
-    )
-
-    if activos:
-        consulta = consulta.where(
-            Prestamo.fecha_devolucion == None
-        )
-
-    return session.exec(consulta).all()
+    return repo.listar_por_socio(session, id, activos)

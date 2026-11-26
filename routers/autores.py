@@ -1,70 +1,39 @@
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from dependencies import servicio_autores
+from services.autores import ServicioAutores
 
-from database import get_session
-from models.autor import Autor, AutorCrear, AutorActualizar, AutorPublico
+from models.autor import AutorCrear, AutorActualizar, AutorPublico
 
 
 router = APIRouter(prefix="/autores", tags=["Autores"])
 
 
 @router.post("/", response_model=AutorPublico, status_code=201)
-def crear_autor(datos: AutorCrear, session: Session = Depends(get_session)):
-    autor = Autor.model_validate(datos)
-
-    session.add(autor)
-    session.commit()
-    session.refresh(autor)
-
-    return autor
+def crear_autor(datos: AutorCrear, servicio: ServicioAutores = Depends(servicio_autores)):
+    return servicio.crear_autor(datos)
 
 
 @router.get("/", response_model=list[AutorPublico])
-def listar_autores(session: Session = Depends(get_session)):
-    return session.exec(select(Autor)).all()
+def listar_autores(servicio: ServicioAutores = Depends(servicio_autores)):
+    return servicio.listar_autores()
 
 
 @router.get("/{id}", response_model=AutorPublico)
-def obtener_autor(id: int, session: Session = Depends(get_session)):
-    autor = session.get(Autor, id)
-
-    if autor is None:
-        raise HTTPException(status_code=404, detail="Autor no encontrado")
-
-    return autor
+def obtener_autor(id: int, servicio: ServicioAutores = Depends(servicio_autores)):
+    return servicio.obtener_autor(id)
 
 
 @router.put("/{id}", response_model=AutorPublico)
 def modificar_autor(
     id: int,
     datos: AutorActualizar,
-    session: Session = Depends(get_session)
+    servicio: ServicioAutores = Depends(servicio_autores)
 ):
-    autor = session.get(Autor, id)
-
-    if autor is None:
-        raise HTTPException(status_code=404, detail="Autor no encontrado")
-
-    autor.nombre = datos.nombre
-    autor.nacionalidad = datos.nacionalidad
-
-    session.add(autor)
-    session.commit()
-    session.refresh(autor)
-
-    return autor
+    return servicio.modificar_autor(id, datos)
 
 
 @router.delete("/{id}")
-def eliminar_autor(id: int, session: Session = Depends(get_session)):
-    autor = session.get(Autor, id)
-
-    if autor is None:
-        raise HTTPException(status_code=404, detail="Autor no encontrado")
-
-    session.delete(autor)
-    session.commit()
-
+def eliminar_autor(id: int, servicio: ServicioAutores = Depends(servicio_autores)):
+    servicio.eliminar_autor(id)
     return {"mensaje": "Autor eliminado correctamente"}
-

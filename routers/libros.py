@@ -1,123 +1,52 @@
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
-from models.autor import Autor
+from dependencies import servicio_libros
+from services.libros import ServicioLibros
 
-from database import get_session
-from models.libro import Libro, LibroCrear, LibroActualizar, LibroPublico
+from models.libro import LibroCrear, LibroActualizar, LibroPublico
 
 
 router = APIRouter(prefix="/libros", tags=["Libros"])
 
 
 @router.post("/", response_model=LibroPublico, status_code=201)
-def crear_libro(datos: LibroCrear, session: Session = Depends(get_session)):
-    existente = session.exec(
-        select(Libro).where(Libro.isbn == datos.isbn)
-    ).first()
-
-    if existente:
-        raise HTTPException(status_code=409, detail="ISBN duplicado")
-
-    libro = Libro.model_validate(datos)
-
-    session.add(libro)
-    session.commit()
-    session.refresh(libro)
-
-    return libro
+def crear_libro(datos: LibroCrear, servicio: ServicioLibros = Depends(servicio_libros)):
+    return servicio.crear_libro(datos)
 
 
 @router.get("/", response_model=list[LibroPublico])
 def listar_libros(
     disponibles: bool = False,
-    session: Session = Depends(get_session)
+    servicio: ServicioLibros = Depends(servicio_libros)
 ):
-    consulta = select(Libro)
-
-    if disponibles:
-        consulta = consulta.where(Libro.stock > 0)
-
-    return session.exec(consulta).all()
+    return servicio.listar_libros(disponibles)
 
 
 @router.get("/{id}", response_model=LibroPublico)
-def obtener_libro(id: int, session: Session = Depends(get_session)):
-    libro = session.get(Libro, id)
-
-    if libro is None:
-        raise HTTPException(status_code=404, detail="Libro no encontrado")
-
-    return libro
+def obtener_libro(id: int, servicio: ServicioLibros = Depends(servicio_libros)):
+    return servicio.obtener_libro(id)
 
 
 @router.put("/{id}", response_model=LibroPublico)
 def modificar_libro(
     id: int,
     datos: LibroActualizar,
-    session: Session = Depends(get_session)
+    servicio: ServicioLibros = Depends(servicio_libros)
 ):
-    libro = session.get(Libro, id)
-
-    if libro is None:
-        raise HTTPException(status_code=404, detail="Libro no encontrado")
-
-    existente = session.exec(
-        select(Libro).where(
-            Libro.isbn == datos.isbn,
-            Libro.id != id
-        )
-    ).first()
-
-    if existente:
-        raise HTTPException(status_code=409, detail="ISBN duplicado")
-
-    libro.titulo = datos.titulo
-    libro.isbn = datos.isbn
-    libro.stock = datos.stock
-    libro.anio = datos.anio
-
-    session.add(libro)
-    session.commit()
-    session.refresh(libro)
-
-    return libro
+    return servicio.modificar_libro(id, datos)
 
 
 @router.delete("/{id}")
-def eliminar_libro(id: int, session: Session = Depends(get_session)):
-    libro = session.get(Libro, id)
-
-    if libro is None:
-        raise HTTPException(status_code=404, detail="Libro no encontrado")
-
-    session.delete(libro)
-    session.commit()
-
+def eliminar_libro(id: int, servicio: ServicioLibros = Depends(servicio_libros)):
+    servicio.eliminar_libro(id)
     return {"mensaje": "Libro eliminado correctamente"}
-    
 
-    
+
 @router.post("/{id}/autores/{autor_id}")
 def asociar_autor(
     id: int,
     autor_id: int,
-    session: Session = Depends(get_session)
+    servicio: ServicioLibros = Depends(servicio_libros)
 ):
-    libro = session.get(Libro, id)
-    autor = session.get(Autor, autor_id)
-
-    if libro is None or autor is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Libro o autor no encontrado"
-        )
-
-    if autor not in libro.autores:
-        libro.autores.append(autor)
-        session.add(libro)
-        session.commit()
-
+    servicio.asociar_autor(id, autor_id)
     return {"mensaje": "Autor asociado correctamente"}
-
-

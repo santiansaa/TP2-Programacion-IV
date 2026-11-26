@@ -19,6 +19,16 @@ API REST para administrar una biblioteca, permitiendo registrar autores, libros,
 - Plazo de devolución de 14 días.
 - Multa de $100 por día de atraso.
 - Consulta de préstamos activos por socio.
+- La baja de un libro o socio con historial de préstamos devuelve HTTP 409 y conserva el historial.
+
+## Organización del código
+
+- `routers/` recibe las peticiones HTTP, valida los datos de entrada con los esquemas y delega en los servicios.
+- `services/` aplica las reglas del catálogo y los préstamos. Por ejemplo, al devolver un libro calcula la multa y repone el stock.
+- `repositories/` consulta y modifica la base mediante SQLModel. Guarda el préstamo y el cambio de stock en una misma transacción.
+- `dependencies.py` construye los servicios y sus repositorios con una sesión por petición.
+- `models/` define las tablas, relaciones y esquemas de entrada y salida.
+- `main.py` registra las rutas y traduce los errores de negocio a respuestas HTTP.
 
 ## Instalación
 
@@ -69,9 +79,9 @@ python -m pytest tests/ -v
 Ejecutar las pruebas con cobertura:
 
 ```powershell
-python -m pytest tests/ --cov=models --cov=routers --cov=services --cov-report=term-missing
+python -m pytest tests/ --cov=models --cov=routers --cov=services --cov=repositories --cov=dependencies --cov=main --cov=database --cov-fail-under=80 --cov-report=term-missing
 ```
 
 **Último resultado verificado:**
-- 19 tests aprobados.
-- 100 % de cobertura de `models/`, `routers/` y `services/`.
+- 31 tests aprobados.
+- 99,33 % de cobertura de líneas de la aplicación.

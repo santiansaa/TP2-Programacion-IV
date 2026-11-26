@@ -1,11 +1,9 @@
-
-
 from fastapi import APIRouter, Depends
-from sqlmodel import Session
 
-from database import get_session
+from dependencies import servicio_prestamos
+from services.prestamos import ServicioPrestamos
+
 from models.prestamo import PrestamoCrear, PrestamoPublico
-from services.prestamos import crear_prestamo, devolver_prestamo
 
 
 router = APIRouter(prefix="/prestamos", tags=["Prestamos"])
@@ -14,14 +12,14 @@ router = APIRouter(prefix="/prestamos", tags=["Prestamos"])
 @router.post("/", response_model=PrestamoPublico, status_code=201)
 def registrar_prestamo(
     datos: PrestamoCrear,
-    session: Session = Depends(get_session)
+    servicio: ServicioPrestamos = Depends(servicio_prestamos)
 ):
-    return crear_prestamo(datos, session)
+    return servicio.crear_prestamo(datos)
 
 
 @router.post("/{id}/devolucion", response_model=PrestamoPublico)
 def registrar_devolucion(
     id: int,
-    session: Session = Depends(get_session)
+    servicio: ServicioPrestamos = Depends(servicio_prestamos)
 ):
-    return devolver_prestamo(id, session)
+    return servicio.devolver_prestamo(id)
